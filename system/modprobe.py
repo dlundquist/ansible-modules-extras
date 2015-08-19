@@ -26,7 +26,7 @@ short_description: Add or remove kernel modules
 requirements: []
 version_added: 1.4
 author:
-    - "David Stygstra (@stygstra)" 
+    - "David Stygstra (@stygstra)"
     - "Julien Dauphant"
     - "Matt Jeffery"
 description:
@@ -61,7 +61,8 @@ def main():
     module = AnsibleModule(
         argument_spec={
             'name': {'required': True},
-            'state': {'default': 'present', 'choices': ['present', 'absent']},
+            'state': {'default': 'present',
+                      'choices': ['present', 'absent', 'probe']},
             'params': {'default': ''},
         },
         supports_check_mode=True,
@@ -91,6 +92,8 @@ def main():
     if module.check_mode:
         if args['state'] == 'present' and not present:
             changed = True
+        if args['state'] == 'probe' and not present:
+            changed = True
         elif args['state'] == 'absent' and present:
             changed = True
         else:
@@ -104,6 +107,13 @@ def main():
             if rc != 0:
                 module.fail_json(msg=err, **args)
             args['changed'] = True
+    elif args['state'] == 'probe':
+        if not present:
+            rc, _, err = module.run_command([module.get_bin_path('modprobe', True), args['name'], args['params']])
+            if rc == 0:
+                args['changed'] = True
+            elif rc != 0 and 'No such device' not in err:
+                module.fail_json(msg=err, **args)
     elif args['state'] == 'absent':
         if present:
             rc, _, err = module.run_command([module.get_bin_path('rmmod', True), args['name']])
